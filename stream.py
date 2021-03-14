@@ -57,7 +57,7 @@ PAGE="""\
 
 CSS="""\
 body {
-    background: #B8F2E6;
+    background: $color3;
 }
 
 img {
@@ -98,8 +98,8 @@ input[type=range]:focus {
     outline: none;
 }
 input[type=range]::-webkit-slider-runnable-track {
-    background: #faf3dd;
-    border: 0.2px solid #5e6472;
+    background: $color2;
+    border: 0.2px solid $color4;
     border-radius: 1.3px;
     width: 100%;
     height: 8.4px;
@@ -109,8 +109,8 @@ input[type=range]::-webkit-slider-thumb {
     margin-top: -11px;
     width: 15px;
     height: 30px;
-    backgorund: #ffa69e;
-    border: 1px solid #5e6472;
+    backgorund: $color1;
+    border: 1px solid $color4;
     border-radius: 5px;
     cursor: pointer;
     -webkit-appearance: none;
@@ -119,8 +119,8 @@ input[type=range]:focus::-webkit-slider-runnable-track {
     background: #fdfbf3;
 }
 input[type=range]::-moz-range-track {
-    background: #faf3dd;
-    border: 0.2px solid #5e6472;
+    background: $color2;
+    border: 0.2px solid $color4;
     border-radius: 1.3px;
     width: 100%;
     height: 8.4px;
@@ -129,8 +129,8 @@ input[type=range]::-moz-range-track {
 input[type=range]::-moz-range-thumb {
     width: 15px;
     height: 30px;
-    background: #ffa69e;
-    border: 1px solid #5e6472;
+    background: $color1;
+    border: 1px solid $color4;
     border-radius: 5px;
     cursor: pointer;
 }
@@ -145,29 +145,29 @@ input[type=range]::-ms-track {
 }
 input[type=range]::-ms-fill-lower {
     background: #f7ebc7;
-    border: 0.2px solid #5e6472;
+    border: 0.2px solid $color4;
     border-radius: 2.6px;
 }
 input[type=range]::-ms-fill-upper {
-    background: #faf3dd;
-    border: 0.2px solid #5e6472;
+    background: $color2;
+    border: 0.2px solid $color4;
     border-radius: 2.6px;
 }
 input[type=range]::-ms-thumb {
     width: 15px;
     height: 30px;
-    background: #ffa69e;
-    border: 1px solid #5e6472;
+    background: $color1;
+    border: 1px solid $color4;
     border-radius: 5px;
     cursor: pointer;
     margin-top: 0px;
     /*Needed to keep the Edge thumb centred*/
 }
 input[type=range]:focus::-ms-fill-lower {
-    background: #faf3dd;
+    background: color2;
 }
 input[type=range]:focus::-ms-fill-upper {
-    background: #fdfbf3;
+    background: $color4;
 }
 @supports (-ms-ime-align:auto) {
     /* Pre-Chromium Edge only styles, selector taken from hhttps://stackoverflow.com/a/32202953/7077589 */
@@ -215,7 +215,11 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
         elif self.path == '/style.css':
             # serve the CSS stylesheet
             d = dict(width = config.get('Stream', 'resolution.width') + 'px', \
-                    height = config.get('Stream', 'resolution.height') + 'px')
+                     height = config.get('Stream', 'resolution.height') + 'px', \
+                     color1 = config.get('Style', 'color1'), \
+                     color2 = config.get('Style', 'color2'), \
+                     color3 = config.get('Style', 'color3'), \
+                     color4 = config.get('Style', 'color4'))
             content = Template(CSS).substitute(d).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'text/css')

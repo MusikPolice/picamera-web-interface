@@ -19,6 +19,12 @@ name: The name of this camera
 port: 8080
 resolution.width: 640
 resolution.height: 480
+
+[Style]
+color1: #FFA69E
+color2: #FAF3DD
+color3: #B8F2E6
+color4: #5E6472
 ```
 
 A few notes:
