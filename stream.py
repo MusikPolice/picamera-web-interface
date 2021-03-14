@@ -5,6 +5,7 @@ import picamera
 import logging
 import socketserver
 import configparser
+import json
 from threading import Condition
 from http import server
 from string import Template
@@ -25,15 +26,38 @@ PAGE="""\
              * See https://bugzilla.mozilla.org/show_bug.cgi?id=1404468
              */
             let FF_FOUC_FIX;
+
+            function updateSettings() {
+                var settings = {
+                    brightness: document.getElementById('brightness-range').value
+                };
+                var json = JSON.stringify(settings);
+                fetch('/settings', {
+                    method: 'post',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: json
+                });
+            }
         </script>
-        <img src="stream.mjpg" width="$width" height="$height" />
+
+        <div id="content">
+            <img src="stream.mjpg" width="$width" height="$height" />
+            <div id="settings">
+                <div id="brightness" class="center-vertical">
+                    <span>Brightness: </span>
+                    <input type="range" id="brightness-range" min="40" max="75" value="50" onchange="updateSettings();">
+                </div>
+            </div>
+        </div>
     </body>
 </html>
 """
 
 CSS="""\
 body {
-    background: rgb(34,34,59);
+    background: #B8F2E6;
 }
 
 img {
@@ -42,8 +66,115 @@ img {
     width: 98%;
     height: auto;
     margin: 5px 1vw 5px 1vw;
-    border: 3px solid rgb(74,78,105);
+    border: 3px solid #5E6472;
     border-radius: 10px;
+}
+
+#brightness {
+    margin-left: 1vw;
+    height: 40px;
+    width: 98%;
+}
+
+#brightness span {
+    color: #5E6472;
+    font-family: verdana;
+}
+
+.center-vertical {
+    display: flex;
+    justify-content: left;
+    align-items: center;
+}
+
+/* As it turns out, styling input ranges is a nightmare */
+input[type=range] {
+    width: 30%;
+    margin: 10px;
+    background-color: transparent;
+    -webkit-appearance: none;
+}
+input[type=range]:focus {
+    outline: none;
+}
+input[type=range]::-webkit-slider-runnable-track {
+    background: #faf3dd;
+    border: 0.2px solid #5e6472;
+    border-radius: 1.3px;
+    width: 100%;
+    height: 8.4px;
+    cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+    margin-top: -11px;
+    width: 15px;
+    height: 30px;
+    backgorund: #ffa69e;
+    border: 1px solid #5e6472;
+    border-radius: 5px;
+    cursor: pointer;
+    -webkit-appearance: none;
+}
+input[type=range]:focus::-webkit-slider-runnable-track {
+    background: #fdfbf3;
+}
+input[type=range]::-moz-range-track {
+    background: #faf3dd;
+    border: 0.2px solid #5e6472;
+    border-radius: 1.3px;
+    width: 100%;
+    height: 8.4px;
+    cursor: pointer;
+}
+input[type=range]::-moz-range-thumb {
+    width: 15px;
+    height: 30px;
+    background: #ffa69e;
+    border: 1px solid #5e6472;
+    border-radius: 5px;
+    cursor: pointer;
+}
+input[type=range]::-ms-track {
+    background: transparent;
+    border-color: transparent;
+    border-width: 14.1px 0;
+    color: transparent;
+    width: 100%;
+    height: 8.4px;
+    cursor: pointer;
+}
+input[type=range]::-ms-fill-lower {
+    background: #f7ebc7;
+    border: 0.2px solid #5e6472;
+    border-radius: 2.6px;
+}
+input[type=range]::-ms-fill-upper {
+    background: #faf3dd;
+    border: 0.2px solid #5e6472;
+    border-radius: 2.6px;
+}
+input[type=range]::-ms-thumb {
+    width: 15px;
+    height: 30px;
+    background: #ffa69e;
+    border: 1px solid #5e6472;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 0px;
+    /*Needed to keep the Edge thumb centred*/
+}
+input[type=range]:focus::-ms-fill-lower {
+    background: #faf3dd;
+}
+input[type=range]:focus::-ms-fill-upper {
+    background: #fdfbf3;
+}
+@supports (-ms-ime-align:auto) {
+    /* Pre-Chromium Edge only styles, selector taken from hhttps://stackoverflow.com/a/32202953/7077589 */
+    input[type=range] {
+        margin: 0;
+        /*Edge starts the margin from the thumb, not the track as other browsers do*/
+    }
 }
 """
 
@@ -115,6 +246,26 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
         else:
             self.send_error(404)
             self.end_headers()
+    def do_POST(self):
+        if self.path == '/settings':
+            try :
+                # parse request body json
+                contentLength = int(self.headers.get('Content-Length'))
+                request = json.loads(self.rfile.read(contentLength))
+                logger.info('POST request from %s: %s', self.client_address, str(request))
+                camera.brightness = int(request['brightness'])
+
+                # if everything worked, respond with a 200 OK
+                self.send_response(200)
+                self.end_headers()
+            except Exception as e:
+                logger.error('Failed to process POST request from %s: %s', self.client_address, str(e))
+                self.send_response(400)
+                self.end_headers()
+        else:
+            self.send_error(404)
+            self.end_headers()
+
 
 class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
     allow_reuse_address = True
@@ -138,6 +289,7 @@ resolutionString = config.get('Stream', 'resolution.width') + 'x' + config.get('
 with picamera.PiCamera(resolution=resolutionString, framerate=24) as camera:
     output = StreamingOutput()
     camera.start_recording(output, format='mjpeg')
+    camera.brightness = 50
     try:
         address = ('', int(config.get('Stream', 'port')))
         server = StreamingServer(address, StreamingHandler)
