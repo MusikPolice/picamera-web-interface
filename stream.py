@@ -4,17 +4,18 @@ import io
 import picamera
 import logging
 import socketserver
+import configparser
 from threading import Condition
 from http import server
+from string import Template
 
-# TODO: replace this with some kind of template library?
 PAGE="""\
 <html>
     <head>
-        <title>picamera-web-interface</title>
+        <title>$title</title>
     </head
     <body>
-        <img src="stream.mjpg" width="640" height="480" />
+        <img src="stream.mjpg" width="$width" height="$height" />
     </body>
 </html>
 """
@@ -44,7 +45,10 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             self.end_headers()
         elif self.path == '/index.html':
             # serve the web page containing the video stream
-            content = PAGE.encode('utf-8')
+            d = dict(title=config.get('General', 'name'), \
+                     width=config.get('Stream', 'resolution.width'), \
+                     height=config.get('Stream', 'resolution.height'))
+            content = Template(PAGE).substitute(d).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'text/html')
             self.send_header('Content-Length', len(content))
@@ -79,13 +83,28 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-# start the camera rolling and the server listening on port 8080
-with picamera.PiCamera(resolution='640x480', framerate=24) as camera:
+# set up the logger
+logger = logging.getLogger('stream')
+logger.setLevel('DEBUG')
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+streamHandler = logging.StreamHandler()
+streamHandler.setFormatter(formatter)
+logger.addHandler(streamHandler)
+
+# read the config file
+config = configparser.ConfigParser()
+config.read('settings.ini')
+logger.info('Initializing stream: ' + config.get('General', 'name'))
+
+# start the camera rolling and the server listening on the configured port
+resolutionString = config.get('Stream', 'resolution.width') + 'x' + config.get('Stream', 'resolution.height')
+with picamera.PiCamera(resolution=resolutionString, framerate=24) as camera:
     output = StreamingOutput()
     camera.start_recording(output, format='mjpeg')
     try:
-        address = ('', 8080)
+        address = ('', int(config.get('Stream', 'port')))
         server = StreamingServer(address, StreamingHandler)
+        logger.info('Listening on port ' + config.get('Stream', 'port'))
         server.serve_forever()
     finally:
         camera.stop_recording()

@@ -127,3 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# settings.ini file (it might contain sensitive information)
+settings.ini
