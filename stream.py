@@ -10,14 +10,41 @@ from http import server
 from string import Template
 
 PAGE="""\
-<html>
+<!DOCTYPE html PUBLIC"-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
     <head>
+        <meta http-equiv="content-type" content="text/html; charset=utf-8" />
         <title>$title</title>
+        <link rel="stylesheet" href="style.css" />
     </head
     <body>
+        <script>
+            /* 
+             * To prevent Firefox FOUC, this must be here
+             * See https://bugzilla.mozilla.org/show_bug.cgi?id=1404468
+             */
+            let FF_FOUC_FIX;
+        </script>
         <img src="stream.mjpg" width="$width" height="$height" />
     </body>
 </html>
+"""
+
+CSS="""\
+body {
+    background: rgb(34,34,59);
+}
+
+img {
+    max-width: $width;
+    max-height: $height;
+    width: 98%;
+    height: auto;
+    margin: 5px 1vw 5px 1vw;
+    border: 3px solid rgb(74,78,105);
+    border-radius: 10px;
+}
 """
 
 class StreamingOutput(object):
@@ -45,12 +72,22 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
             self.end_headers()
         elif self.path == '/index.html':
             # serve the web page containing the video stream
-            d = dict(title=config.get('General', 'name'), \
-                     width=config.get('Stream', 'resolution.width'), \
-                     height=config.get('Stream', 'resolution.height'))
+            d = dict(title = config.get('General', 'name'), \
+                     width = config.get('Stream', 'resolution.width'), \
+                     height = config.get('Stream', 'resolution.height'))
             content = Template(PAGE).substitute(d).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'text/html')
+            self.send_header('Content-Length', len(content))
+            self.end_headers()
+            self.wfile.write(content)
+        elif self.path == '/style.css':
+            # serve the CSS stylesheet
+            d = dict(width = config.get('Stream', 'resolution.width') + 'px', \
+                    height = config.get('Stream', 'resolution.height') + 'px')
+            content = Template(CSS).substitute(d).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/css')
             self.send_header('Content-Length', len(content))
             self.end_headers()
             self.wfile.write(content)
