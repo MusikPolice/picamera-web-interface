@@ -6,7 +6,7 @@ This code borrows heavily from example code published in the [PiCamera documenta
 ## Dependencies
 Before you can get started, you'll need to make sure that you have both Python 3 and the PiCamera Python module installed:
 ```
-sudo apt-get install python3 python3-picamera
+sudo apt-get install python3 python3-picamera python3-gpiozero
 ```
 
 ## Configuration

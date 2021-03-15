@@ -9,6 +9,7 @@ import json
 from threading import Condition
 from http import server
 from string import Template
+from gpiozero import LED
 
 PAGE="""\
 <!DOCTYPE html PUBLIC"-//W3C//DTD XHTML 1.0 Strict//EN"
@@ -29,7 +30,8 @@ PAGE="""\
 
             function updateSettings() {
                 var settings = {
-                    brightness: document.getElementById('brightness-range').value
+                    brightness: document.getElementById('brightness-range').value,
+                    ir: document.getElementById('ir-toggle').checked
                 };
                 var json = JSON.stringify(settings);
                 fetch('/settings', {
@@ -48,6 +50,13 @@ PAGE="""\
                 <div id="brightness" class="center-vertical">
                     <span>Brightness: </span>
                     <input type="range" id="brightness-range" min="40" max="75" value="50" onchange="updateSettings();">
+                </div>
+                <div id="ir" class="center-vertical">
+                    <span>Infrared: </span>
+                    <label class="switch">
+                        <input id="ir-toggle" type="checkbox" onchange="updateSettings()">
+                        <span class="slider round"></span>
+                    </label>
                 </div>
             </div>
         </div>
@@ -176,6 +185,69 @@ input[type=range]:focus::-ms-fill-upper {
         /*Edge starts the margin from the thumb, not the track as other browsers do*/
     }
 }
+
+/* style the IR toggle switch */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+}
+
+/* Hide default HTML checkbox */
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* The slider */
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: #2196F3;
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #2196F3;
+}
+
+input:checked + .slider:before {
+  -webkit-transform: translateX(26px);
+  -ms-transform: translateX(26px);
+  transform: translateX(26px);
+}
+
+/* Rounded sliders */
+.slider.round {
+  border-radius: 34px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
 """
 
 class StreamingOutput(object):
@@ -259,6 +331,13 @@ class StreamingHandler(server.BaseHTTPRequestHandler):
                 logger.info('POST request from %s: %s', self.client_address, str(request))
                 camera.brightness = int(request['brightness'])
 
+                # infrared is backward - pulling the pin low turns it on
+                # TODO: figure out how to flip the the pin to active low so this is nicer code
+                if request['ir'] == True:
+                    ir.off()
+                else:
+                    ir.on()
+
                 # if everything worked, respond with a 200 OK
                 self.send_response(200)
                 self.end_headers()
@@ -287,6 +366,10 @@ logger.addHandler(streamHandler)
 config = configparser.ConfigParser()
 config.read('settings.ini')
 logger.info('Initializing stream: ' + config.get('General', 'name'))
+
+# initialize the camera - turn off IR mode
+ir = LED(4)
+ir.on()
 
 # start the camera rolling and the server listening on the configured port
 resolutionString = config.get('Stream', 'resolution.width') + 'x' + config.get('Stream', 'resolution.height')
